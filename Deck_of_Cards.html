@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Deck of Cards</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+
+        class Card {
+            constructor(suit, value) {
+                this.suit = suit;
+                this.value = value;
+            }
+
+            getCardImageId(){
+                return this.suit.substring(0,1)+this.value;
+            }
+
+            getCardSuit(){
+                return this.suit.toLowerCase().replace(/\b[a-z]/g, function(letter) {
+                    return letter.toUpperCase();
+                });
+            }
+
+            getCardValue(){
+                return (this.value==1)?'Ace':(this.value==11)?'Jack':(this.value==12)?'Queen':(this.value==13)?'King':this.value;
+            }
+
+            getCardWeight(){
+                return (this.value==1)?11:(this.value==11)?10:(this.value==12)?10:(this.value==13)?10:this.value;
+            }
+
+            showCard() {
+                return `<div class="card"><img src="images/${this.getCardImageId()}.png" alt="${this.getCardValue()} of ${this.getCardSuit()}s"></div>`;
+            }
+        }
+
+        class Deck {
+            constructor() {
+                this.suits = ['spade', 'heart', 'diamond', 'club'];
+                this.cards = [];
+            }
+            
+            shuffle() {
+                let shuffled = [];
+                
+                while(this.cards.length > 0){
+                    let idx = Math.floor(Math.random() * Math.floor(this.cards.length));
+                    let card = this.cards[idx];
+                    this.cards.splice(idx, 1);
+                    
+                    shuffled.push(card);
+                }
+
+                this.cards = shuffled;
+                return this;
+            }
+
+            reset() {
+                for(let suit in this.suits){
+                    for(let j=0; j<13; j++){
+                        this.cards.push(new Card(this.suits[suit], j+1));
+                    }
+                }
+
+                this.shuffle();
+                return this;
+            }
+
+            deal_card(){
+                let card = this.cards.pop();
+                console.log(`Drew card: ${card.getCardValue()} of ${card.getCardSuit()}s`);
+                return card;
+            }
+
+            display() {
+                for(let card in this.cards){
+                    $('#player1').append(`<div class="card"><img src="images/${this.cards[card].getCardImageId()}.png" alt="${this.cards[card].getCardValue()} of ${this.cards[card].getCardSuit()}s"></div>`);
+                }
+            }
+        }
+
+        class Player {
+            constructor(name) {
+                this.name = name;
+                this.hand = [];
+            }
+
+            getScore(){
+                let score = 0, cardVal = 0, aces = 0;
+
+                console.log('*********************')
+
+                for(let card in this.hand){
+                    cardVal = (this.hand[card].getCardWeight());
+
+                    console.log('Card Value: '+cardVal);
+                    if(cardVal == 11) {
+                        aces += 1;
+                    }
+                    score += cardVal;
+                }
+
+                console.log('Score: '+score)
+                console.log('Aces: '+aces)
+
+                while(score > 21 && aces > 0){
+                    score -= 10;
+                    aces -=1;
+                }
+
+                console.log('Score: '+score)
+                console.log('*********************')
+
+                return score;
+            }
+        }
+
+        class Table {
+            constructor(players) {
+                this.players = players;
+                this.addPlayersToTable();
+            }
+
+            addPlayersToTable(){
+                for(let player in this.players){
+                    let playerNum = (parseInt(player)+1);
+                    let playerName = this.players[player].name;
+                    $('#players').append(`<div id="${playerName}${playerNum}" class="player"><p>${playerName}</p></div>`);
+                }
+            }
+
+            addDealerToTable(dealer){
+                this.players.push(dealer);
+                let dealerName = this.players[this.players.length-1].name;
+                $('#dealer').append(`<div id="${dealerName}${this.players.length}" class="dealer"><p>${dealerName}</p></div>`);
+            }
+
+            clearBoard(){
+                let players = this.players;
+                for(let player in players){
+                    players[player].hand.length = 0;
+                }
+                $('.card').remove();
+                $('#table .message').remove();
+            }
+        }
+
+        class Dealer extends Player {
+            constructor(table) {
+                super('Dealer');
+
+                this.deck = new Deck();
+                this.deck.reset().shuffle();
+                this.table = table;
+                this.turn = 0;
+
+                this.addDealerToTable();
+                this.dealAll();
+                this.startRound();
+            }
+
+            addDealerToTable(){
+                this.table.addDealerToTable(this);
+            }
+            
+            reset(){
+                this.deck.reset();
+                this.turn = 0;
+                return this;
+            }
+
+            dealAll(){
+                for(let i=0; i<2; i++){
+                    for(let player in this.table.players){
+                        let playerNum = (parseInt(player)+1);
+                        let card = this.deck.deal_card();
+                        let name = this.table.players[player].name;
+                        let $playerLayer = $('#'+name+playerNum);
+
+                        this.table.players[player].hand.push(card);
+
+                        if($playerLayer.hasClass('player')){
+                            $playerLayer.find('p').before(card.showCard());
+                        }else{
+                            if(i == 0){
+                                $playerLayer.find('p').after('<div class="card"><img src="images/b1fv.png" alt="Card Back - No Peaking" id="dealerDown"></div>');
+                            }else{
+                                $playerLayer.find('p+div').after(card.showCard());
+                            }
+                        }
+                    }
+                }
+                return this;
+            }
+            
+            dealCard() {
+                let player = this.table.players[this.turn];
+                let name = player.name;
+                let playerNum = (parseInt(this.turn)+1);
+                let $playerLayer = $('#'+name+playerNum);
+                let card = this.deck.deal_card();
+
+                player.hand.push(card);
+                $playerLayer.find('p').before(card.showCard());
+
+                let score = player.getScore();
+                
+                console.log('Player #'+playerNum+': '+name)
+                console.log(score)
+
+                if(score > 21){
+                    $('#busted').clone().appendTo('#'+player.name+(this.turn+1)).removeClass('hidden');
+                    this.nextTurn();
+                }else if(score == 21){
+                    this.nextTurn();
+                }
+            }
+
+            startRound() {
+                let players = this.table.players;
+                let dealer = players[players.length-1];
+                let score = dealer.getScore();
+
+                if(score == 21){
+                    $('#dealerDown').attr('src', 'images/'+dealer.hand[0].getCardImageId()+'.png').parents('.dealer').addClass('flip');
+                    this.endRound(score);
+                }else{
+                    this.nextPlay();
+                }
+            }
+
+            nextPlay(){
+                let player = this.table.players[this.turn];
+                let score = player.getScore();
+
+                if(this.turn == this.table.players.length-1){
+                    this.checkDealer();
+                }else{
+                    if(score == 21){
+                        $('#blackjack').clone().appendTo('#'+player.name+(this.turn+1)).removeClass('hidden');
+                        this.nextTurn();
+                    }else{
+                        $('#'+player.name+(this.turn+1)).append('<div id="buttons"><button id="hit">Hit</button><button id="stand">Stand</button></div>');
+                    }
+                }
+            }
+
+            nextTurn() {
+                let player = this.table.players[this.turn];
+                $('#'+player.name+(this.turn+1) + ' #buttons').remove();
+                this.turn++;
+                this.nextPlay();
+            }
+
+            checkDealer(){
+                let players = this.table.players;
+                let dealer = players[players.length-1];
+                let dealerScore = dealer.getScore();
+                let playerNum = (parseInt(players.length));
+                let name = dealer.name;
+                let $playerLayer = $('#'+name+playerNum);
+
+                console.log('#'+name+playerNum);
+
+                $('#dealerDown').attr('src', 'images/'+dealer.hand[0].getCardImageId()+'.png').parents('.dealer').addClass('flip');
+
+                if(dealerScore >= 17){
+                    this.endRound(dealerScore);
+                }else{
+                    while(dealerScore < 17){
+                        let card = this.deck.deal_card();
+
+                        dealer.hand.push(card);
+                        $playerLayer.find('p+div').after(card.showCard());
+
+                        dealerScore = dealer.getScore();
+                    }
+
+                    if(dealerScore > 21){
+                        $('#busted').clone().appendTo($playerLayer).removeClass('hidden');
+                    }
+                    this.endRound(dealerScore);
+                }
+            }
+
+            endRound(dealerScore) {
+                let players = this.table.players;
+                console.log('Dealers Score: ' + dealerScore);
+                // Check all players' scores to see if they beat the dealer.  If dealer score is 21 then PUSH
+                for(let player=0; player<players.length-1; player++){
+                    let playerName = players[player].name;
+                    let score = players[player].getScore();
+                    let playerNum = parseInt(player+1);
+
+                    console.log('Checking Player #'+playerNum+' '+playerName+' - Score: '+score);
+                    
+                    if(dealerScore > 21 && score <= 21 || dealerScore < score && score <= 21){
+                        if($('#'+playerName+playerNum+' .message').length==0) $('#winner').clone().appendTo('#'+playerName+playerNum).removeClass('hidden');
+                    }else if(dealerScore == score && score <= 21){
+                        $('#push').clone().appendTo('#'+playerName+playerNum).removeClass('hidden');
+                    }else if(dealerScore > score && score < 21){
+                        $('#lost').clone().appendTo('#'+playerName+playerNum).removeClass('hidden');
+                    }
+                }
+            }
+        }
+
+        $(document).ready(function(){
+            
+            let gameTable = new Table([new Player('Chris'), new Player('Lawyer'), new Player('Ashley'), new Player('Mark')]);
+            let dealer = new Dealer(gameTable);
+
+            $(document).on('click', '#stand', function(){
+                dealer.nextTurn();
+            });
+
+             $(document).on('click', '#hit', function(){
+                dealer.dealCard();
+            });
+
+            $(document).on('click', '#play_again button', function(){
+                gameTable.clearBoard();
+                dealer.reset().dealAll().startRound();
+            });
+        });
+
+    </script>
+</head>
+<body>
+    <div id="wrapper">
+        <h1>Blackjack</h1>
+        <!-- <div id="stack">
+            <img src="images/b1fv.png" alt="deck">
+        </div> -->
+        <div id="table">
+            <div id="dealer">
+            </div>
+            <div id="players">
+            </div>
+        </div>
+        <div id="play_again">
+            <button>Play Again</button>
+        </div>
+        <div id="messages">
+            <div id="busted" class="hidden message">
+                <p>Busted!</p>
+            </div>
+            <div id="lost" class="hidden message">
+                <p>Lost!</p>
+            </div>
+            <div id="winner" class="hidden message">
+                <p>Winner!</p>
+            </div>
+            <div id="blackjack" class="hidden message">
+                <p>Blackjack!</p>
+            </div>
+            <div id="push" class="hidden message">
+                <p>Push!</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
